@@ -3,14 +3,14 @@ Harvard Case Study
 
 Knitted Pdf is uploaded. 
 
-Technology: 
+<b>Technology:</b> <br> 
 R
 
-Models/concepts:
-Random forest
-Adaboost
-Stepwise regression
-Over sampling
-under sampling
-EDA
+<b>Models/concepts:<br></b>
+Random forest<br>
+Adaboost<br>
+Stepwise regression<br>
+Over sampling<br>
+under sampling<br>
+EDA<br>
 Binary/ Multi classification
