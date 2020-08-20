@@ -1,0 +1,247 @@
+
+
+```{r}
+rm(list=ls())
+
+setwd("C:\\Users\\thoma\\Documents\\UIC\\Courses\\IDS 572 Data Mining\\Asst4")
+
+library(readxl)
+
+Train <- read_excel("IMB651-XLS-ENG.xlsx", sheet = "Training Data for Multi-Class M",
+                    col_names = T)
+
+Test <- read_excel("IMB651-XLS-ENG.xlsx", sheet = "Test Data for Multi-Class Model",
+                    col_names = T)
+
+```
+
+
+```{r}
+print(dim(Train))
+print(dim(Test))
+
+
+
+```
+
+
+```{r}
+
+str(Train)
+
+table(unlist(lapply(Train, class)))
+
+sum(is.na(Train))
+
+## Target Variables
+#CE_NPS, NPS_Status
+
+table(Train$CE_NPS)
+table(Train$NPS_Status)
+
+Train2 <- Train[,-1]
+
+```
+
+
+```{r}
+## Creating a 2 class variable for Detractors
+
+Train2$Detractor_class <- ifelse(Train2$NPS_Status=="Detractor",1,0)
+table(Detractor_class)
+
+```
+
+
+```{r}
+
+colnames(Train2)
+cols_exclude <- c("CE_NPS","NPS_Status","AdmissionDate","DischargeDate",
+                  "Estimatedcost","AgeYrs","HospitalNo2","Detractor_class")
+
+
+xvars <- Train2[, !(colnames(Train2) %in% cols_exclude), drop = FALSE]
+
+
+t1 <- table(Train2$MaritalStatus, Train2$"CE_NPS")
+t1
+class(t1)
+t2 <- as.data.frame.matrix(t1)
+t2
+# rownames(t2)
+# t2["Divorced",]
+
+ks <- apply(t2,1,function(r) (all(r %in% 0))|(length(which(r!=0))==1))
+ks
+
+
+l1 <-  list()
+
+for (i in 1:length(ks)){
+  if (ks[i]==T){
+    tmp <- names(ks)[i]
+    l1 <- append(l1,tmp)
+
+    }
+  }
+
+for (i in ncol(Train2)){
+  
+  d[i] <- table(Train2[,i],Train2$CE_NPS)
+}
+
+
+
+```
+
+
+## Converting survey questions to ordinal variables
+```{r}
+cols_exclude2 <- c("CE_NPS","NPS_Status","AdmissionDate","DischargeDate",
+                  "Estimatedcost","AgeYrs","HospitalNo2")
+
+
+Train3 <- Train2[, !(colnames(Train2) %in% cols_exclude2), drop = FALSE]
+
+colnames(Train3)
+
+cols_exclude3 <- c("LengthofStay","MaritalStatus","Sex",
+                   "BedCategory","Department", "InsPayorcategory",
+                   "State","Country","STATEZONE","Detractor_class")
+
+Train3[,cols_exclude3]
+
+library(dplyr)
+library(tidyr)
+
+c1 <- as.factor(Train3$EM_DOCTOR)
+class(Train3$EM_DOCTOR)
+class(c1)
+
+ordinal_vars <- Train3 %>% 
+  select(-c(cols_exclude3)) %>% 
+  mutate_if(is.numeric,as.ordered)
+
+  
+str(ordinal_vars)
+
+cols_to_keep <- c("LengthofStay","MaritalStatus","Sex",
+                  "BedCategory","Department", "InsPayorcategory",
+                  "Estimatedcost","AgeYrs")
+
+Train4_binary <- cbind(Train2[,cols_to_keep],ordinal_vars, Train2["Detractor_class"])
+
+class(Train4)
+
+```
+
+
+## Prepping Test Data
+
+```{r}
+dim(Test)
+
+Test2 <- Test[,-1]
+
+## Creating a 2 class variable for Detractors
+
+Test2$Detractor_class <- ifelse(Test2$NPS_Status=="Detractor",1,0)
+table(Test2$Detractor_class)
+
+cols_exclude4 <- c("CE_NPS","NPS_Status","AdmissionDate","DischargeDate",
+                  "Estimatedcost","AgeYrs","HospitalNo2",
+                  "LengthofStay","MaritalStatus","Sex",
+                   "BedCategory","Department", "InsPayorcategory",
+                   "State","Country","STATEZONE","Detractor_class")
+
+Test2[,cols_exclude4]
+library(tidyr)
+library(dplyr)
+
+ordinal_vars_test <- Test2 %>% 
+  dplyr::select(-c(cols_exclude4)) %>% 
+  mutate_if(is.numeric,as.ordered)
+
+
+
+dim(ordinal_vars)
+
+
+Test_binary <- cbind(Test2[,cols_to_keep],ordinal_vars_test, Test2["Detractor_class"])
+
+
+## Multiclass dataset
+Test_multiclass <- cbind(Test2[,cols_to_keep],ordinal_vars_test, Test2["NPS_Status"])
+
+```
+
+
+## Q 6
+## Stepwise Regression -Forward
+```{r}
+library(MASS)
+full.model <- glm(Detractor_class ~., data = Train4_binary, family = "binomial")
+# Stepwise regression model
+step.model <- stepAIC(full.model, direction = "forward", 
+                      trace = FALSE)
+summary(step.model)
+
+```
+
+
+
+## Q 7
+```{r}
+## Multiclass dataset
+Train5_multiclass <- cbind(Train2[,cols_to_keep],ordinal_vars, Train2["NPS_Status"])
+
+
+## Randomforest for Binary Classification
+
+library(randomForest)
+class(Train4_binary$Detractor_class)
+
+Train4_binary$Detractor_class <- as.factor(Train4_binary$Detractor_class)
+
+
+# Converting character columns to factor variables for Randomforest
+
+Train5_binary <- Train4_binary %>% 
+  mutate_if(is.character,as.factor)
+  
+
+
+
+str(Train5_binary)
+mtry_value <- tuneRF(Train5_binary[,-c(Detractor_class)],
+                     Train5_binary$Detractor_class, 
+                     mtryStart = 10,
+                     ntreeTry=100, improve = 0.1)
+
+best.m <- mtry_value[mtry_value[, 2] == min(mtry_value[, 2]), 1]
+print(mtry_value)
+print(best.m)
+
+## best ntree value
+
+
+## Cross Validation
+
+folds <- sample(rep(1:5, length.out = nrow(iris)), size = nrow(iris), replace = F)
+
+table(folds)
+
+CV_rf <- lapply(1:5, function(x){ #5 corresponds to the number of folds defined earlier
+  model <- randomForest(Species ~ ., data = iris[folds != x,])
+  preds <- predict(model,  iris[folds == x,], type="response")
+  return(data.frame(preds, real = iris$Species[folds == x]))
+  })
+
+
+rf1 <- randomForest(Detractor_class~. , data = Train5_binary, importance = T)
+
+plot(rf1)
+
+```
+
+
